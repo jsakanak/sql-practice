@@ -7,6 +7,14 @@
 -- Date     : May 2026
 -- ============================================================
 
+-- ============================================================
+-- DATA NOTE: 3,147 order lines excluded from this table
+-- Reason   : No matching invoice found in Sales.Invoices
+-- These represent open/unfulfilled orders at time of extract
+-- OTIF cannot be calculated without a confirmed delivery time
+-- Impact   : 228,265 of 231,412 source rows loaded (98.6%)
+-- ============================================================
+
 -- Step 1: Create table
 CREATE TABLE FactOrders (
     OrderLineID             INT             NOT NULL PRIMARY KEY,
