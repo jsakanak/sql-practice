@@ -122,8 +122,8 @@ sql-practice/
 ### SQL Practice
 | Topic | Status |
 |---|---|
-| 01 — Exploration & Profiling | 🟡 In progress |
-| 02 — WWI Dimension Design | 🟡 In progress |
+| 01 — Exploration & Profiling | ✅ Complete |
+| 02 — WWI Dimension Design | ✅ Complete |
 | 03 — Basics | 🔲 Not started |
 | 04 — Filtering & Sorting | 🔲 Not started |
 | 05 — Joins | 🔲 Not started |
@@ -138,9 +138,9 @@ sql-practice/
 | Phase | Status |
 |---|---|
 | Schema exploration | ✅ Complete |
-| Star schema design | 🟡 In progress |
-| DW database build | 🔲 Not started |
-| Dimension pipeline | 🔲 Not started |
+| Star schema design | ✅ Complete |
+| DW database build | ✅ Complete |
+| Dimension pipeline | ✅ Complete |
 | Fact pipeline | 🔲 Not started |
 | Power BI connection | 🔲 Not started |
 | OTIF dashboard | 🔲 Not started |
