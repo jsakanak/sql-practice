@@ -1,19 +1,18 @@
-# SQL Practice & WideWorldImporters OTIF Pipeline
+# Supply Chain Analytics — WideWorldImporters
 
-SQL development and data warehouse pipeline project using **WideWorldImporters** on SQL Server Express.  
+An end-to-end supply chain analytics project using **WideWorldImporters** on SQL Server Express.  
 Built as part of a structured progression toward PL-300 and DP-600 certification, and to support a transition into data analyst roles in supply chain and logistics.
 
 ---
 
 ## Project Overview
 
-This repository contains two streams of work:
+This project covers the full analytics stack — from raw OLTP data through to interactive Power BI reporting:
 
-**Stream 1 — SQL Practice**  
-Structured query practice covering core T-SQL concepts, using WideWorldImporters as the source database. Exercises progress from basics through to window functions, CTEs, and stored procedures.
-
-**Stream 2 — OTIF Pipeline**  
-An end-to-end data warehouse pipeline built from scratch. Extracts data from the WideWorldImporters OLTP database, transforms it into a star schema, and loads it into a custom data warehouse — ready for Power BI reporting.
+- **SQL pipeline** — data warehouse built from scratch using T-SQL
+- **Power BI dashboard** — OTIF reporting built on the warehouse
+- **Supply chain analysis** — applied investigations into operational issues
+- **Python automation** — pipeline scheduling and orchestration (planned)
 
 ---
 
@@ -40,7 +39,7 @@ Download: [Microsoft SQL Server Samples](https://github.com/Microsoft/sql-server
 
 | Component | Definition |
 |---|---|
-| **On Time** | `ConfirmedDeliveryTime` ≤ `ExpectedDeliveryDate` |
+| **On Time** | `CAST(ConfirmedDeliveryTime AS DATE)` ≤ `ExpectedDeliveryDate` |
 | **In Full** | `PickedQuantity` ≥ `Quantity` |
 | **OTIF** | Both conditions met |
 
@@ -64,8 +63,6 @@ WideWorldImportersDW (Star Schema)
                        │
 DimCustomer ──── FactOrders ──── DimStockItem
                        │
-              DimDeliveryMethod
-                       │
                    DimPeople
 ```
 
@@ -77,39 +74,42 @@ DimCustomer ──── FactOrders ──── DimStockItem
 | OrderID | Order reference |
 | CustomerID | FK → DimCustomer |
 | StockItemID | FK → DimStockItem |
-| DeliveryMethodID | FK → DimDeliveryMethod |
 | OrderDateKey | FK → DimDate |
 | ExpectedDeliveryDateKey | FK → DimDate |
+| SalespersonPersonID | FK → DimPeople |
+| PickedByPersonID | FK → DimPeople (nullable) |
 | Quantity | Quantity ordered |
 | PickedQuantity | Quantity fulfilled |
 | UnitPrice | Line unit price |
 | TotalLineValue | Quantity × UnitPrice |
 | IsInFull | 1 if PickedQuantity >= Quantity |
-| IsOnTime | 1 if delivered by expected date |
-| IsOTIF | 1 if both conditions met |
-| DaysLate | Days beyond expected delivery |
+| IsOnTime | 1 if delivered by expected date, NULL if unconfirmed |
+| IsOTIF | 1 if both conditions met, NULL if unconfirmed |
+| DaysLate | Days beyond expected delivery, NULL if unconfirmed |
 | BackorderQuantity | Quantity - PickedQuantity |
+
+**Data Notes:**
+- 3,147 order lines excluded — no matching invoice (open orders)
+- 284 order lines (84 orders) have NULL OTIF flags — no confirmed delivery time
+- DeliveryMethodID removed — all orders use Delivery Van (ID 3)
 
 ---
 
 ## Folder Structure
 
 ```
-sql-practice/
+supply-chain-analytics-wwi/
 │
-├── 01_exploration/          # Schema and column profiling queries
-├── 02_wwi_dimensions/       # Dimension design and profiling
-├── 03_basics/               # SELECT, FROM, WHERE, aliases
-├── 04_filtering_sorting/    # WHERE, ORDER BY, TOP, DISTINCT
-├── 05_joins/                # INNER, LEFT, RIGHT, FULL
-├── 06_aggregation/          # GROUP BY, HAVING, aggregate functions
-├── 07_subqueries/           # Correlated, scalar, EXISTS, IN
-├── 08_window_functions/     # ROW_NUMBER, RANK, LAG, LEAD
-├── 09_case_when/            # Conditional logic and bucketing
-├── 10_ctes/                 # Common Table Expressions
-├── 11_stored_procedures/    # Parameters, error handling
-├── 12_pipeline/             # DW build scripts and ETL pipeline
-├── notebooks/               # Jupyter notebooks for Python analysis
+├── sql/
+│   ├── pipeline/            # DW build scripts and ETL pipeline
+│   ├── analysis/            # Applied supply chain investigations
+│   └── exploration/         # Schema profiling and dimension design
+│
+├── powerbi/
+│   └── screenshots/         # Dashboard screenshots
+│
+├── python/                  # Automation scripts (planned)
+├── notebooks/               # Jupyter notebooks (planned)
 │
 ├── .gitignore
 └── README.md
@@ -119,21 +119,6 @@ sql-practice/
 
 ## Progress
 
-### SQL Practice
-| Topic | Status |
-|---|---|
-| 01 — Exploration & Profiling | ✅ Complete |
-| 02 — WWI Dimension Design | ✅ Complete |
-| 03 — Basics | 🔲 Not started |
-| 04 — Filtering & Sorting | 🔲 Not started |
-| 05 — Joins | 🔲 Not started |
-| 06 — Aggregation | 🔲 Not started |
-| 07 — Subqueries | 🔲 Not started |
-| 08 — Window Functions | 🔲 Not started |
-| 09 — CASE WHEN | 🔲 Not started |
-| 10 — CTEs | 🔲 Not started |
-| 11 — Stored Procedures | 🔲 Not started |
-
 ### OTIF Pipeline
 | Phase | Status |
 |---|---|
@@ -141,9 +126,28 @@ sql-practice/
 | Star schema design | ✅ Complete |
 | DW database build | ✅ Complete |
 | Dimension pipeline | ✅ Complete |
-| Fact pipeline | 🔲 Not started |
-| Power BI connection | 🔲 Not started |
-| OTIF dashboard | 🔲 Not started |
+| Fact pipeline | ✅ Complete |
+| Power BI connection | ✅ Complete |
+| OTIF dashboard | 🟡 In progress |
+
+### Supply Chain Analysis
+| Investigation | Status |
+|---|---|
+| Gu shirt XL/4XL OTIF root cause | ✅ Complete |
+
+### Automation (Planned)
+| Task | Status |
+|---|---|
+| Wrap pipeline into stored procedure | 🔲 Not started |
+| SQL Server Agent Job nightly refresh | 🔲 Not started |
+| Python pipeline scheduling | 🔲 Not started |
+
+---
+
+## Key Findings
+
+**Gu Shirt OTIF Investigation (May 2026)**  
+OTIF dashboard identified XL (17%) and 4XL (24%) as significant outliers vs 99%+ for all other sizes. SQL investigation across sales, purchasing, and stock holdings confirmed near-zero stock on hand at dataset end (XL = 48 units, 4XL = 25 units vs 51,000–525,000 for other sizes). Purchasing data quality limitations prevented full replenishment analysis. Documented in `sql/analysis/01_gu_shirt_otif_size_analysis.sql`.
 
 ---
 
@@ -153,9 +157,10 @@ sql-practice/
 [folder] Short description
 
 Examples:
-[01_exploration] Schema and column profiling queries for WWI
-[12_pipeline] Create DimCustomer table and INSERT pipeline
-[08_window_functions] Running OTIF % by customer using window functions
+[sql/pipeline] Create and populate DimCustomer
+[sql/analysis] OTIF root cause analysis for Gu shirt range
+[powerbi] Add OTIF Overview dashboard screenshots
+[python] Add pipeline scheduling script
 ```
 
 ---
