@@ -3,9 +3,6 @@
 -- Analysis : OTIF Investigation — "The Gu" Red Shirt XL & 4XL
 -- Purpose  : Root cause analysis of poor OTIF performance on
 --            specific shirt sizes identified via Power BI dashboard
--- Finding  : Newly listed product (May 2016) with no formal
---            replenishment process — stock depleted with no PO
---            raised until end of dataset period
 -- Author   : James Sakanak
 -- Date     : May 2026
 -- ============================================================
@@ -13,27 +10,55 @@
 -- ============================================================
 -- SUMMARY OF FINDINGS
 -- ============================================================
--- Step 1: Power BI OTIF dashboard identified XL and 4XL sizes
---         of "The Gu" red shirt performing at 17% and 24% OTIF
---         respectively, vs 99%+ for all other sizes
+-- ISSUE IDENTIFIED:
+-- Power BI OTIF dashboard flagged XL (17% OTIF) and 4XL (24%)
+-- as significant outliers vs 99%+ for all other shirt sizes.
 --
--- Step 2: SQL analysis confirmed lower order volumes for XL/4XL
---         vs other sizes — ruling out high demand as the cause
+-- INVESTIGATION STEPS:
+-- Step 1: OTIF by size — confirmed XL/4XL as outliers
+-- Step 2: PO history — initial filter showed 1 unfulfilled PO
+--         but this was misleading (filter excluded fulfilled POs)
+-- Step 3: System migration check — ALL 227 stock items share
+--         ValidFrom = 2016-05-31, confirming a data migration.
+--         ValidFrom cannot be used to determine product history.
+-- Step 4: Full replenishment vs sales analysis — purchasing data
+--         for StockItemID 95 (XL) and 98 (4XL) shows anomalous
+--         PO counts (963 and 954) vs 1 PO for all other sizes,
+--         with replenishment volumes (9.2M and 18.8M units) far
+--         exceeding total sales. This is inconsistent with the
+--         rest of the range and suggests a data quality issue
+--         in the WideWorldImporters sample database.
 --
--- Step 3: Purchase order investigation revealed only ONE PO
---         ever raised for each size, on 31st May 2016, with
---         zero units received — confirming no replenishment
+-- DATA QUALITY LIMITATION:
+-- Purchasing data for XL and 4XL StockItemIDs appears to contain
+-- records that do not belong to these items — likely a data
+-- generation artefact in the WWI sample database. Replenishment
+-- analysis cannot be completed reliably for these sizes.
 --
--- Step 4: Stock item master data revealed ValidFrom = 2016-05-31
---         for ALL shirt sizes — product range only formally
---         added to system on that date despite orders going
---         back to 2013
+-- CONCLUSION:
+-- The purchasing schema does not provide sufficient data quality
+-- to definitively determine root cause. Based on OTIF and sales
+-- data alone, the most likely operational explanations are:
+--   A) Insufficient opening stock for XL/4XL at migration
+--   B) Replenishment frequency not keeping pace with demand
+--   C) Demand signal distortion — poor service reducing orders
+--      which further reduces perceived demand
 --
--- ROOT CAUSE: Brand new product line added to system May 2016.
---             XL and 4XL had insufficient opening stock.
---             No reorder process in place before system setup.
---             Stock depleted with no replenishment — every
---             customer order fulfilled from residual stock only.
+-- RECOMMENDATION:
+-- In a real environment, cross-reference with:
+--   1. Stock on hand at time of each failed order
+--   2. Reorder point and safety stock settings per SKU
+--   3. Supplier lead time variability for these sizes
+--   4. Historical demand forecasts vs actuals
+--
+-- FINAL CONFIRMATION:
+-- StockItemHoldings confirms stock depletion at dataset end:
+--   XL  = 48 units remaining
+--   4XL = 25 units remaining
+--   All other sizes = 51,000 to 525,000 units
+-- Stock depletion is confirmed as the primary operational cause.
+-- No time-series stock data available in WWI to trace the
+-- depletion trajectory over the 2013-2016 period.
 -- ============================================================
 
 
@@ -60,8 +85,9 @@ ORDER BY OTIF_Pct ASC;
 
 
 -- ============================================================
--- Step 2: Purchase order history for XL and 4XL
--- Confirms only one PO ever raised, never fulfilled
+-- Step 2: Purchase order history — undelivered POs only
+-- NOTE: This query only returns unfulfilled POs
+--       Full PO history exists for XL/4XL — see Step 4
 -- ============================================================
 
 SELECT
@@ -86,51 +112,94 @@ GROUP BY si.StockItemName
 ORDER BY si.StockItemName;
 
 
-
-
 -- ============================================================
--- Step 3: Stock item master — ValidFrom date investigation
--- Reveals entire product range added to system May 2016
+-- Step 3: System migration check
+-- All 227 stock items share ValidFrom = 2016-05-31
+-- Confirms data migration — ValidFrom not reliable for analysis
 -- ============================================================
 
-SELECT
-    StockItemID,
-    StockItemName,
-    Size,
-    LeadTimeDays,
-    QuantityPerOuter,
-    UnitPrice,
-    ValidFrom,
-    ValidTo,
-    JSON_VALUE(CustomFields, '$.Range')             AS ProductRange
+SELECT 
+    CAST(ValidFrom AS DATE)                         AS ValidFromDate,
+    COUNT(*)                                        AS ItemCount
 FROM WideWorldImporters.Warehouse.StockItems
-WHERE StockItemName LIKE '%Gu%red shirt%Black%'
-ORDER BY StockItemName;
+GROUP BY CAST(ValidFrom AS DATE)
+ORDER BY ItemCount DESC;
 
 
 -- ============================================================
--- Step 4: Full purchase order detail for XL and 4XL
--- Shows outstanding unfulfilled orders at dataset end
+-- Step 4: Replenishment vs sales analysis
+-- Uses temp tables to avoid cartesian product between
+-- sales and purchasing data sources
+-- NOTE: XL and 4XL show anomalous PO counts — see data
+--       quality note in summary above
 -- ============================================================
 
+-- Clean up temp tables if they exist
+IF OBJECT_ID('tempdb..#Sales') IS NOT NULL DROP TABLE #Sales;
+IF OBJECT_ID('tempdb..#Purchasing') IS NOT NULL DROP TABLE #Purchasing;
+
+-- Sales side
 SELECT
     si.StockItemName,
-    po.OrderDate,
-    po.ExpectedDeliveryDate,
-    pol.OrderedOuters,
-    pol.ReceivedOuters,
-    pol.OrderedOuters - pol.ReceivedOuters          AS MissedQuantity,
-    pol.LastReceiptDate,
-    pol.IsOrderLineFinalized,
-    v.SupplierName
+    COUNT(DISTINCT f.OrderLineID)                   AS TotalSalesOrders,
+    SUM(f.Quantity)                                 AS TotalUnitsSold
+INTO #Sales
+FROM WideWorldImportersDW.dbo.FactOrders f
+JOIN WideWorldImportersDW.dbo.DimStockItem si 
+    ON f.StockItemID = si.StockItemID
+WHERE si.StockItemName LIKE '%Gu%red shirt%Black%'
+GROUP BY si.StockItemName;
+
+-- Purchasing side
+SELECT
+    si.StockItemName,
+    COUNT(DISTINCT po.PurchaseOrderID)              AS TotalPOs,
+    SUM(pol.ReceivedOuters)                         AS TotalOutersReceived,
+    AVG(pol.OrderedOuters)                          AS AvgOutersPerPO
+INTO #Purchasing
 FROM WideWorldImporters.Purchasing.PurchaseOrderLines pol
 JOIN WideWorldImporters.Purchasing.PurchaseOrders po
     ON pol.PurchaseOrderID = po.PurchaseOrderID
 JOIN WideWorldImporters.Warehouse.StockItems si
     ON pol.StockItemID = si.StockItemID
-JOIN WideWorldImporters.Purchasing.Suppliers v
-    ON po.SupplierID = v.SupplierID
 WHERE si.StockItemName LIKE '%Gu%red shirt%Black%'
-  AND si.StockItemName LIKE '%XL%'
-  AND (pol.OrderedOuters - pol.ReceivedOuters) > 1
-ORDER BY si.StockItemName, po.OrderDate;
+GROUP BY si.StockItemName;
+
+-- Combine with unit conversion (QuantityPerOuter = 12 for all shirts)
+SELECT
+    s.StockItemName,
+    s.TotalSalesOrders,
+    s.TotalUnitsSold,
+    p.TotalPOs,
+    p.TotalOutersReceived,
+    p.TotalOutersReceived * 12                      AS TotalUnitsReplenished,
+    p.AvgOutersPerPO * 12                           AS AvgUnitsPerDelivery,
+    s.TotalUnitsSold - 
+        (p.TotalOutersReceived * 12)                AS ReplenishmentGap
+FROM #Sales s
+LEFT JOIN #Purchasing p 
+    ON s.StockItemName COLLATE Latin1_General_CI_AS = 
+       p.StockItemName COLLATE Latin1_General_CI_AS
+ORDER BY ReplenishmentGap DESC;
+
+-- Clean up
+DROP TABLE #Sales;
+DROP TABLE #Purchasing;
+
+-- ============================================================
+-- Step 5: Current stock on hand confirmation
+-- Confirms near-zero stock for XL and 4XL at dataset end
+-- Source : Warehouse.StockItemHoldings (point-in-time only)
+-- ============================================================
+
+SELECT
+    si.StockItemName,
+    sh.QuantityOnHand,
+    sh.BinLocation,
+    sh.LastStocktakeQuantity,
+    sh.LastEditedWhen
+FROM WideWorldImporters.Warehouse.StockItemHoldings sh
+JOIN WideWorldImporters.Warehouse.StockItems si
+    ON sh.StockItemID = si.StockItemID
+WHERE si.StockItemName LIKE '%Gu%red shirt%Black%'
+ORDER BY si.StockItemName;
