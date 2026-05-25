@@ -28,6 +28,13 @@
 --            where ConfirmedDeliveryTime IS NULL
 -- Action   : ALTER COLUMN on IsOnTime, IsOTIF, DaysLate to allow NULL
 -- ============================================================
+-- Date     : May 2026
+-- Change   : Removed DeliveryMethodID column
+-- Reason   : All 228,265 orders use Delivery Van (ID 3) exclusively
+--            Column provides no analytical value
+-- Action   : DROP CONSTRAINT FK_FactOrders_DimDeliveryMethod
+--            DROP COLUMN DeliveryMethodID
+-- ============================================================
 
 -- Step 1: Create table
 CREATE TABLE FactOrders (
@@ -35,7 +42,6 @@ CREATE TABLE FactOrders (
     OrderID                 INT             NOT NULL,
     CustomerID              INT             NOT NULL,
     StockItemID             INT             NOT NULL,
-    DeliveryMethodID        INT             NOT NULL,
     SalespersonPersonID     INT             NOT NULL,
     PickedByPersonID        INT             NULL,
     OrderDateKey            INT             NOT NULL,
@@ -54,8 +60,6 @@ CREATE TABLE FactOrders (
         FOREIGN KEY (CustomerID) REFERENCES DimCustomer(CustomerID),
     CONSTRAINT FK_FactOrders_DimStockItem
         FOREIGN KEY (StockItemID) REFERENCES DimStockItem(StockItemID),
-    CONSTRAINT FK_FactOrders_DimDeliveryMethod
-        FOREIGN KEY (DeliveryMethodID) REFERENCES DimDeliveryMethod(DeliveryMethodID),
     CONSTRAINT FK_FactOrders_OrderDate
         FOREIGN KEY (OrderDateKey) REFERENCES DimDate(DateKey),
     CONSTRAINT FK_FactOrders_ExpectedDeliveryDate
