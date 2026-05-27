@@ -11,6 +11,7 @@ CREATE TABLE DimStockItem (
     StockItemID             INT             NOT NULL PRIMARY KEY,
     StockItemName           NVARCHAR(100)   NOT NULL,
     SupplierID              INT             NOT NULL,
+    SupplierName            NVARCHAR(100)   NULL,
     Brand                   NVARCHAR(50)    NULL,
     Size                    NVARCHAR(20)    NULL,
     IsChillerStock          BIT             NOT NULL,
@@ -27,6 +28,7 @@ INSERT INTO DimStockItem
 SELECT
     StockItemID,
     StockItemName,
+    s.SupplierName,
     SupplierID,
     Brand,
     Size,
