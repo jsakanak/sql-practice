@@ -16,6 +16,10 @@ This project covers the full analytics stack — from raw OLTP data through to i
 
 ---
 
+## Dashboard Preview
+
+[View full dashboard (PDF)](powerbi/screenshots/WWI_OTIF_Dashboard.pdf)
+
 ## Database
 
 **WideWorldImporters** — Microsoft's sample OLTP database for a fictional novelty goods importer/exporter.  
@@ -128,7 +132,7 @@ supply-chain-analytics-wwi/
 | Dimension pipeline | ✅ Complete |
 | Fact pipeline | ✅ Complete |
 | Power BI connection | ✅ Complete |
-| OTIF dashboard | 🟡 In progress |
+| OTIF dashboard | ✅ Complete |
 
 ### Supply Chain Analysis
 | Investigation | Status |
